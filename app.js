@@ -297,16 +297,101 @@ function addItem() {
 // 事件委派：清單的刪除、freq、weight 全部在這裡處理，避免 innerHTML 重建造成重複觸發
 document.addEventListener('click', e => {
   const delBtn = e.target.closest('[data-del]');
-  if (delBtn) {
-    deleteItem(Number(delBtn.dataset.del));
-  }
+  if (delBtn) { deleteItem(Number(delBtn.dataset.del)); return; }
+
+  const editBtn = e.target.closest('[data-edit]');
+  if (editBtn) { toggleEditor(Number(editBtn.dataset.edit)); return; }
+
+  const saveBtn = e.target.closest('[data-save]');
+  if (saveBtn) { saveEdit(Number(saveBtn.dataset.save)); return; }
+
+  const cancelBtn = e.target.closest('[data-cancel]');
+  if (cancelBtn) { closeEditor(Number(cancelBtn.dataset.cancel)); return; }
+
+  const clearImg = e.target.closest('[data-clearimg]');
+  if (clearImg) { clearEditImg(Number(clearImg.dataset.clearimg)); return; }
 });
+
 document.addEventListener('change', e => {
   const freqSel = e.target.closest('[data-freq]');
   if (freqSel) { setFreq(Number(freqSel.dataset.freq), freqSel.value); return; }
   const weightSel = e.target.closest('[data-weight]');
-  if (weightSel) { setWeight(Number(weightSel.dataset.weight), weightSel.value); }
+  if (weightSel) { setWeight(Number(weightSel.dataset.weight), weightSel.value); return; }
+  const editFile = e.target.closest('[data-editimg]');
+  if (editFile) { handleEditFile(e, Number(editFile.dataset.editimg)); return; }
+  const editEmoji = e.target.closest('[data-editemoji]');
+  if (editEmoji) { syncEditEmojiPreview(Number(editEmoji.dataset.editemoji)); }
 });
+
+function toggleEditor(id) {
+  const editor = document.getElementById(`editor-${id}`);
+  if (!editor) return;
+  const isOpen = editor.style.display !== 'none';
+  // 關閉所有其他編輯器
+  document.querySelectorAll('.list-item-editor').forEach(e => e.style.display = 'none');
+  if (!isOpen) editor.style.display = 'block';
+}
+
+function closeEditor(id) {
+  const editor = document.getElementById(`editor-${id}`);
+  if (editor) editor.style.display = 'none';
+}
+
+function handleEditFile(event, id) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const data = e.target.result;
+    const preview = document.getElementById(`editPreview-${id}`);
+    if (!preview) return;
+    preview.dataset.img = data;
+    preview.style.backgroundImage = `url(${data})`;
+    preview.style.backgroundSize = 'cover';
+    preview.style.backgroundPosition = 'center';
+    preview.textContent = '';
+    document.getElementById(`editEmoji-${id}`).value = '';
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function syncEditEmojiPreview(id) {
+  const emojiInput = document.getElementById(`editEmoji-${id}`);
+  const preview = document.getElementById(`editPreview-${id}`);
+  if (!emojiInput || !preview) return;
+  preview.dataset.img = '';
+  preview.style.backgroundImage = '';
+  preview.textContent = emojiInput.value || '＋';
+}
+
+function clearEditImg(id) {
+  const preview = document.getElementById(`editPreview-${id}`);
+  const emojiInput = document.getElementById(`editEmoji-${id}`);
+  if (!preview) return;
+  preview.dataset.img = '';
+  preview.style.backgroundImage = '';
+  preview.textContent = '＋';
+  if (emojiInput) emojiInput.value = '';
+}
+
+function saveEdit(id) {
+  const item = myList.find(i => i.id === id);
+  if (!item) return;
+  const name = document.getElementById(`editName-${id}`)?.value.trim();
+  if (!name) return;
+  const preview = document.getElementById(`editPreview-${id}`);
+  const emojiVal = document.getElementById(`editEmoji-${id}`)?.value.trim();
+  const imgData = preview?.dataset.img || '';
+  item.name = name;
+  item.tag = document.getElementById(`editTag-${id}`)?.value || item.tag;
+  item.budget = document.getElementById(`editBudget-${id}`)?.value || item.budget;
+  item.transport = document.getElementById(`editTransport-${id}`)?.value || item.transport;
+  item.icon = imgData || emojiVal || '';
+  saveList();
+  renderList();
+  renderTagSelect();
+}
 
 function deleteItem(id) {
   myList = myList.filter(i => i.id !== id);
@@ -352,29 +437,79 @@ function renderList() {
       `<option value="${k}" ${(item.freq||'daily')===k?'selected':''}>${v}</option>`
     ).join('');
     return `
-    <div class="list-item ${onCooldown ? 'list-item-cooldown' : ''}">
-      <div class="list-item-left">
-        ${itemIconHtml(item)}
-        <div>
-          <div class="list-item-name">${item.name}${onCooldown ? ` <span class="cooldown-badge">冷卻 ${daysLeft}天</span>` : ''}</div>
-          <div class="list-item-meta">
-            <span class="list-item-tag">${item.tag}</span>
-            <span class="list-item-tag">${BUDGET_LABEL[item.budget] || '$'}</span>
-            <span class="list-item-tag">${TRANSPORT_LABEL[item.transport] || ''}</span>
-          </div>
-          <div class="list-item-selects">
-            <select class="freq-select" data-freq="${item.id}">${freqOpts}</select>
-            <select class="weight-select" data-weight="${item.id}">
-              ${[1,2,3,4,5].map(w => `<option value="${w}" ${(item.weight||1)==w?'selected':''}>${'⭐'.repeat(w)}</option>`).join('')}
-            </select>
+    <div class="list-item ${onCooldown ? 'list-item-cooldown' : ''}" data-id="${item.id}">
+      <div class="list-item-main">
+        <div class="list-item-left">
+          ${itemIconHtml(item)}
+          <div>
+            <div class="list-item-name">${item.name}${onCooldown ? ` <span class="cooldown-badge">冷卻 ${daysLeft}天</span>` : ''}</div>
+            <div class="list-item-meta">
+              <span class="list-item-tag">${item.tag}</span>
+              <span class="list-item-tag">${BUDGET_LABEL[item.budget] || '$'}</span>
+              <span class="list-item-tag">${TRANSPORT_LABEL[item.transport] || ''}</span>
+            </div>
+            <div class="list-item-selects">
+              <select class="freq-select" data-freq="${item.id}">${freqOpts}</select>
+              <select class="weight-select" data-weight="${item.id}">
+                ${[1,2,3,4,5].map(w => `<option value="${w}" ${(item.weight||1)==w?'selected':''}>${'⭐'.repeat(w)}</option>`).join('')}
+              </select>
+            </div>
           </div>
         </div>
+        <div class="list-item-right">
+          <button class="list-item-edit" data-edit="${item.id}">✏️</button>
+          <button class="list-item-del" data-del="${item.id}">🗑</button>
+        </div>
       </div>
-      <div class="list-item-right">
-        <button class="list-item-del" data-del="${item.id}">🗑</button>
+      <div class="list-item-editor" id="editor-${item.id}" style="display:none">
+        ${buildEditor(item)}
       </div>
     </div>
   `}).join('');
+}
+
+function buildEditor(item) {
+  const tagOpts = getAllTags().map(t =>
+    `<option value="${t.name}" ${item.tag === t.name ? 'selected' : ''}>${t.emoji} ${t.name}</option>`
+  ).join('');
+  const hasImg = item.icon && item.icon.startsWith('data:');
+  return `
+    <div class="editor-form">
+      <div class="editor-icon-row">
+        <div class="editor-icon-preview ${hasImg ? '' : 'editor-icon-emoji'}"
+          id="editPreview-${item.id}"
+          data-img="${hasImg ? item.icon : ''}"
+          onclick="document.getElementById('editFile-${item.id}').click()"
+          style="${hasImg ? `background-image:url(${item.icon});background-size:cover;background-position:center;` : ''}">
+          ${hasImg ? '' : (item.icon || getTagEmoji(item.tag))}
+        </div>
+        <input id="editFile-${item.id}" type="file" accept="image/*" style="display:none" data-editimg="${item.id}" />
+        <input class="editor-emoji-input" id="editEmoji-${item.id}" type="text" maxlength="2"
+          placeholder="😀" value="${hasImg ? '' : (item.icon || '')}"
+          data-editemoji="${item.id}" />
+        <button class="editor-clear-img" data-clearimg="${item.id}">✕ 清除圖片</button>
+      </div>
+      <input class="editor-name" id="editName-${item.id}" type="text" value="${item.name}" placeholder="餐廳名稱" />
+      <div class="editor-row">
+        <select class="editor-select" id="editTag-${item.id}">${tagOpts}</select>
+        <select class="editor-select" id="editBudget-${item.id}">
+          <option value="1" ${item.budget==='1'?'selected':''}>$ 便宜</option>
+          <option value="2" ${item.budget==='2'?'selected':''}>$$ 普通</option>
+          <option value="3" ${item.budget==='3'?'selected':''}>$$$ 貴</option>
+        </select>
+        <select class="editor-select" id="editTransport-${item.id}">
+          <option value="walk" ${item.transport==='walk'?'selected':''}>🚶 走路</option>
+          <option value="bike" ${item.transport==='bike'?'selected':''}>🛵 騎車</option>
+          <option value="car" ${item.transport==='car'?'selected':''}>🚗 開車</option>
+          <option value="any" ${item.transport==='any'?'selected':''}>🌐 皆可</option>
+        </select>
+      </div>
+      <div class="editor-actions">
+        <button class="btn-primary editor-save" data-save="${item.id}">儲存</button>
+        <button class="btn-ghost editor-cancel" data-cancel="${item.id}">取消</button>
+      </div>
+    </div>
+  `;
 }
 
 // ── 結果頁操作 ────────────────────────────────────────
@@ -900,12 +1035,7 @@ function handleIconFile(event) {
 
 // ── 匯出 / 匯入 ───────────────────────────────────────
 function exportData() {
-  const data = {
-    version: 1,
-    myList,
-    customTags,
-    eatHistory: history,
-  };
+  const data = { version: 1, myList, customTags, eatHistory: history };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -914,6 +1044,54 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+function shareLink() {
+  // 只分享清單和自訂 tag（不含圖片 base64，太大）
+  const shareData = {
+    version: 1,
+    myList: myList.map(i => ({ ...i, icon: i.icon?.startsWith('data:') ? '' : (i.icon || '') })),
+    customTags,
+  };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(shareData))));
+  const url = `${location.origin}${location.pathname}#import=${encoded}`;
+  if (navigator.share) {
+    navigator.share({ title: '今天吃什麼？清單', url });
+  } else {
+    navigator.clipboard.writeText(url).then(() => alert('連結已複製！傳給對方開啟即可匯入'));
+  }
+}
+
+// 頁面載入時檢查 URL 是否有 import 參數
+function checkImportFromUrl() {
+  const hash = location.hash;
+  if (!hash.startsWith('#import=')) return;
+  try {
+    const encoded = hash.slice(8);
+    const json = decodeURIComponent(escape(atob(encoded)));
+    const data = JSON.parse(json);
+    if (!data.myList) return;
+    if (!confirm(`收到分享清單（${data.myList.length} 間餐廳），要匯入嗎？\n⚠️ 注意：會合併到現有清單`)) {
+      history.replaceState(null, '', location.pathname);
+      return;
+    }
+    // 合併：以 name 為 key，不重複新增
+    const existingNames = new Set(myList.map(i => i.name));
+    const newItems = data.myList.filter(i => !existingNames.has(i.name));
+    myList = [...myList, ...newItems];
+    if (data.customTags) {
+      const existingTagNames = new Set(customTags.map(t => t.name));
+      customTags = [...customTags, ...data.customTags.filter(t => !existingTagNames.has(t.name))];
+      saveCustomTags();
+    }
+    saveList();
+    location.hash = '';
+    alert(`匯入完成！新增了 ${newItems.length} 間餐廳`);
+  } catch {
+    alert('連結格式有誤');
+  }
+}
+
+window.addEventListener('load', checkImportFromUrl);
 
 function importData(event) {
   const file = event.target.files[0];
