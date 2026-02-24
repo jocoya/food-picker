@@ -174,6 +174,8 @@ let quizStep = 0;
 let quizFiltered = [...FOOD_CATEGORIES];
 let activeFilter = '全部';
 let includeCooldown = false; // 是否把冷卻中的餐廳也加入選擇
+let manualPool = []; // 手動從清單勾選的餐廳，非空時優先使用
+let selectMode = false; // 清單頁是否在選擇模式
 
 // ── 今日設定 ──────────────────────────────────────────
 function selectSetup(type, val, btn) {
@@ -218,7 +220,7 @@ function renderQuiz() {
   if (quizStep >= QUIZ_QUESTIONS.length || quizFiltered.length <= 1) {
     // 問完了，直接出結果
     const pick = quizFiltered[Math.floor(Math.random() * quizFiltered.length)];
-    showResult(pick);
+    showResult(pick, quizFiltered);
     return;
   }
   const q = QUIZ_QUESTIONS[quizStep];
@@ -240,10 +242,19 @@ function answerQuiz(optIndex) {
   renderQuiz();
 }
 
-function showResult(item) {
+function showResult(item, pool) {
   currentResult = item;
   rerollLeft = 3;
-  rerollPool = quizFiltered.length > 1 ? quizFiltered.filter(f => f !== item) : [];
+  // pool 優先，其次手動選擇，其次轉盤，最後問卷
+  const activePool = pool ? pool
+    : manualPool.length ? manualPool
+    : spinItems.length ? spinItems
+    : quizFiltered.length > 1 ? quizFiltered
+    : [];
+  rerollPool = activePool.filter(f => f !== item && f.name !== item.name);
+  // 結果出來後清空手動選擇
+  manualPool = [];
+  selectMode = false;
   const hero = document.getElementById('resultHero');
   const emojiEl = document.getElementById('resultEmoji');
   // 清除舊圖
@@ -314,6 +325,8 @@ document.addEventListener('click', e => {
   const editBtn = e.target.closest('[data-edit]');
   if (editBtn) { toggleEditor(Number(editBtn.dataset.edit)); return; }
 
+  const checkBtn = e.target.closest('[data-check]');
+  if (checkBtn) { toggleManualItem(Number(checkBtn.dataset.check)); return; }
   const saveBtn = e.target.closest('[data-save]');
   if (saveBtn) { saveEdit(Number(saveBtn.dataset.save)); return; }
 
@@ -448,9 +461,11 @@ function renderList() {
     const freqOpts = Object.entries(FREQ_LABEL).map(([k, v]) =>
       `<option value="${k}" ${(item.freq||'daily')===k?'selected':''}>${v}</option>`
     ).join('');
+    const isSelected = manualPool.some(i => i.id === item.id);
     return `
-    <div class="list-item ${onCooldown ? 'list-item-cooldown' : ''}" data-id="${item.id}">
+    <div class="list-item ${onCooldown ? 'list-item-cooldown' : ''} ${selectMode && isSelected ? 'list-item-selected' : ''}" data-id="${item.id}">
       <div class="list-item-main">
+        ${selectMode ? `<button class="list-item-check ${isSelected ? 'checked' : ''}" data-check="${item.id}">${isSelected ? '✅' : '⬜'}</button>` : ''}
         <div class="list-item-left">
           ${itemIconHtml(item)}
           <div>
@@ -460,24 +475,39 @@ function renderList() {
               <span class="list-item-tag">${BUDGET_LABEL[item.budget] || '$'}</span>
               <span class="list-item-tag">${TRANSPORT_LABEL[item.transport] || ''}</span>
             </div>
-            <div class="list-item-selects">
+            ${!selectMode ? `<div class="list-item-selects">
               <select class="freq-select" data-freq="${item.id}">${freqOpts}</select>
               <select class="weight-select" data-weight="${item.id}">
                 ${[1,2,3,4,5].map(w => `<option value="${w}" ${(item.weight||1)==w?'selected':''}>${'⭐'.repeat(w)}</option>`).join('')}
               </select>
-            </div>
+            </div>` : ''}
           </div>
         </div>
-        <div class="list-item-right">
+        ${!selectMode ? `<div class="list-item-right">
           <button class="list-item-edit" data-edit="${item.id}">✏️</button>
           <button class="list-item-del" data-del="${item.id}">🗑</button>
-        </div>
+        </div>` : ''}
       </div>
-      <div class="list-item-editor" id="editor-${item.id}" style="display:none">
-        ${buildEditor(item)}
-      </div>
+      ${!selectMode ? `<div class="list-item-editor" id="editor-${item.id}" style="display:none">${buildEditor(item)}</div>` : ''}
     </div>
   `}).join('');
+
+  // 選擇模式底部 bar
+  let bar = document.getElementById('select-mode-bar');
+  if (selectMode) {
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'select-mode-bar';
+      bar.className = 'select-mode-bar';
+      document.getElementById('page-list-manage').appendChild(bar);
+    }
+    bar.innerHTML = `
+      <span class="select-count">已選 ${manualPool.length} 間</span>
+      <button class="btn-primary select-go" onclick="startWithManualPool()" ${manualPool.length < 1 ? 'disabled' : ''}>開始選餐廳 →</button>
+    `;
+  } else if (bar) {
+    bar.remove();
+  }
 }
 
 function buildEditor(item) {
@@ -578,20 +608,31 @@ function startSpin() {
 }
 
 function getFilteredList() {
+  // 手動勾選優先，直接回傳，不走任何其他過濾
+  if (manualPool.length) return [...manualPool];
+
   let pool = includeCooldown ? [...myList] : myList.filter(i => !isOnCooldown(i));
-  // 交通過濾：嚴格執行，不 fallback
   if (todayTransport) pool = pool.filter(i => TRANSPORT_REACH[todayTransport].includes(i.transport));
-  // 預算過濾：cheap = 只列 $/$$ (budget 1,2)，treat = 不限制
   if (todayBudget === 'cheap') pool = pool.filter(i => parseInt(i.budget || '2') <= 2);
-  // treat 不過濾
   if (activeFilter && activeFilter !== '全部') pool = pool.filter(i => i.tag === activeFilter);
-  // fallback 只放寬冷卻，不放寬交通和預算
   if (!pool.length) {
-    let fallback = myList;
+    // fallback：放寬冷卻，但保留交通/預算/tag 條件
+    let fallback = [...myList];
     if (todayTransport) fallback = fallback.filter(i => TRANSPORT_REACH[todayTransport].includes(i.transport));
     if (todayBudget === 'cheap') fallback = fallback.filter(i => parseInt(i.budget || '2') <= 2);
     if (activeFilter && activeFilter !== '全部') fallback = fallback.filter(i => i.tag === activeFilter);
-    pool = fallback.length ? fallback : myList;
+    // 如果還是空，只放寬冷卻（保留 tag）
+    if (!fallback.length && activeFilter && activeFilter !== '全部') {
+      fallback = myList.filter(i => i.tag === activeFilter);
+    }
+    // 最後 fallback：如果 tag 有選，不能無視 tag 回傳全部
+    if (!fallback.length) {
+      pool = activeFilter && activeFilter !== '全部'
+        ? myList.filter(i => i.tag === activeFilter)
+        : myList;
+    } else {
+      pool = fallback;
+    }
   }
   return pool;
 }
@@ -644,7 +685,7 @@ function spinWheel() {
       // 指針在 12 點鐘方向（-π/2），需補上偏移
       const normalized = (((-spinAngle - Math.PI / 2) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
       const idx = Math.floor(normalized / slice) % spinItems.length;
-      showResult(spinItems[idx]);
+      showResult(spinItems[idx], spinItems);
     }
   }
   requestAnimationFrame(animate);
@@ -737,7 +778,7 @@ function initSwipeDrag() {
 // ── 對決 ──────────────────────────────────────────────
 function startDuelRound(pool) {
   duelPool = [...pool];
-  if (duelPool.length === 1) { showResult(duelPool[0]); return; }
+  if (duelPool.length === 1) { showResult(duelPool[0], duelPool); return; }
   duelRound = [...duelPool];
   duelNextRound = [];
   goTo('page-duel');
@@ -747,7 +788,7 @@ function startDuelRound(pool) {
 function nextDuel() {
   if (duelRound.length < 2) {
     duelNextRound.push(...duelRound);
-    if (duelNextRound.length === 1) { showResult(duelNextRound[0]); return; }
+    if (duelNextRound.length === 1) { showResult(duelNextRound[0], duelPool); return; }
     duelRound = [...duelNextRound];
     duelNextRound = [];
   }
@@ -773,8 +814,7 @@ function startQuickRandom() {
   const pool = getFilteredList();
   if (!pool.length) { alert('清單是空的，請先新增餐廳'); return; }
   const item = pickWeighted(pool);
-  rerollPool = pool.filter(i => i !== item);
-  showResult(item);
+  showResult(item, pool);
 }
 
 // ── 模式頁篩選 ────────────────────────────────────────
@@ -994,7 +1034,7 @@ function finishMultiplayer() {
       startDuelRound(union);
     }
   } else if (intersection.length === 1) {
-    showResult(intersection[0]);
+    showResult(intersection[0], intersection);
   } else {
     startDuelRound(intersection);
   }
@@ -1139,4 +1179,47 @@ function importData(event) {
   };
   reader.readAsText(file);
   event.target.value = '';
+}
+
+// ── 手動選擇清單 ──────────────────────────────────────
+function enterSelectMode() {
+  selectMode = true;
+  manualPool = [];
+  renderList();
+  // 更新 top-bar 按鈕
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) { btn.textContent = '✕ 取消'; btn.onclick = clearSelectMode; }
+}
+
+function exitSelectMode() {
+  selectMode = false;
+  // 注意：不清空 manualPool，讓選擇模式結束後仍保留勾選
+  renderList();
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) { btn.textContent = '✅ 選擇'; btn.onclick = enterSelectMode; }
+}
+
+function clearSelectMode() {
+  selectMode = false;
+  manualPool = [];
+  renderList();
+  const btn = document.getElementById('selectModeBtn');
+  if (btn) { btn.textContent = '✅ 選擇'; btn.onclick = enterSelectMode; }
+}
+
+function toggleManualItem(id) {
+  const item = myList.find(i => i.id === id);
+  if (!item) return;
+  const idx = manualPool.findIndex(i => i.id === id);
+  if (idx >= 0) manualPool.splice(idx, 1);
+  else manualPool.push(item);
+  renderList();
+}
+
+function startWithManualPool() {
+  if (!manualPool.length) return;
+  const saved = [...manualPool]; // 先備份
+  clearSelectMode();             // 關閉 UI 並清空 selectMode
+  manualPool = saved;            // 還原 manualPool
+  goTo('page-mode');
 }

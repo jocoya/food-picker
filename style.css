@@ -751,3 +751,40 @@ body {
   cursor: pointer;
 }
 .hero-back-btn:active { background: rgba(255,255,255,0.35); }
+
+/* Select mode */
+.list-item-check {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0 8px 0 0;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.list-item-selected {
+  background: #fff8f0;
+  border: 1.5px solid #f7931e;
+}
+.select-mode-bar {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  border-top: 1px solid #eee;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+}
+.select-count {
+  font-size: 14px;
+  color: #666;
+  flex-shrink: 0;
+}
+.select-go {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+}
