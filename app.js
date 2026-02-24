@@ -88,24 +88,26 @@ let rerollPool = [];
 
 // 今日設定
 let todayBudget = null;    // '1' | '2' | '3'
-let todayTransport = null; // 'walk' | 'bike' | 'car'
+let todayTransport = null; // 'mall' | 'bike' | 'car'
 let todaySpecial = false;  // 今天想吃特別的？
 
-// 交通可達性：walk 只能走路，bike 可走路+騎車，car 全部
-const TRANSPORT_REACH = { walk: ['walk','any'], bike: ['walk','bike','any'], car: ['walk','bike','car','any'] };
+// 交通可達性：嚴格對應，只有 any 可被所有模式選到
+// mall=百貨（步行可達）, bike=騎車, car=開車, any=不限
+const TRANSPORT_REACH = {
+  mall: ['mall', 'any'],
+  bike: ['bike', 'any'],
+  car:  ['car',  'any'],
+};
 
 // 預算反向權重：今天省錢 → 便宜的店權重高
 // item.budget: '1'=便宜, '2'=普通, '3'=貴
 function budgetWeight(item) {
+  if (todayBudget === 'treat') return 1; // 吃點好的，不加權
+  // cheap：便宜的店權重高
   const b = parseInt(item.budget || '2');
-  const t = parseInt(todayBudget || '2');
-  // 差距越大（貴的店在省錢模式）→ 權重越低
-  const diff = b - t; // 正數=比預算貴，負數=比預算便宜
-  if (diff >= 2) return 0.2;
-  if (diff === 1) return 0.5;
-  if (diff === 0) return 1;
-  if (diff === -1) return 1.5; // 比預算便宜，稍微加權
-  return 2; // 便宜很多，最高權重
+  if (b === 1) return 2;
+  if (b === 2) return 1;
+  return 0.3;
 }
 
 // 頻率對應冷卻天數
@@ -191,6 +193,16 @@ function selectSetup(type, val, btn) {
 
 function finishSetup() {
   goTo('page-home');
+}
+
+function backToSetup() {
+  // 重置今日設定
+  todayBudget = null;
+  todayTransport = null;
+  // 清除 setup 頁的選取狀態
+  document.querySelectorAll('#setupBudget .setup-opt, #setupTransport .setup-opt').forEach(b => b.classList.remove('active'));
+  document.getElementById('setupGoBtn').disabled = true;
+  goTo('page-setup');
 }
 
 // ── 問卷模式 ──────────────────────────────────────────
@@ -410,7 +422,7 @@ function setFreq(id, val) {
 }
 
 const BUDGET_LABEL = { '1': '$', '2': '$$', '3': '$$$' };
-const TRANSPORT_LABEL = { walk: '🚶', bike: '🛵', car: '🚗', any: '🌐' };
+const TRANSPORT_LABEL = { mall: '🏬', bike: '🛵', car: '🚗', any: '🌐' };
 
 // 回傳 item 的圖示 HTML（圖片優先，其次 emoji icon，最後 tag emoji）
 function itemIconHtml(item, size = 40) {
@@ -498,10 +510,10 @@ function buildEditor(item) {
           <option value="3" ${item.budget==='3'?'selected':''}>$$$ 貴</option>
         </select>
         <select class="editor-select" id="editTransport-${item.id}">
-          <option value="walk" ${item.transport==='walk'?'selected':''}>🚶 走路</option>
+          <option value="mall" ${item.transport==='mall'?'selected':''}>🏬 百貨</option>
           <option value="bike" ${item.transport==='bike'?'selected':''}>🛵 騎車</option>
           <option value="car" ${item.transport==='car'?'selected':''}>🚗 開車</option>
-          <option value="any" ${item.transport==='any'?'selected':''}>🌐 皆可</option>
+          <option value="any" ${item.transport==='any'?'selected':''}>🌐 不限</option>
         </select>
       </div>
       <div class="editor-actions">
@@ -567,10 +579,21 @@ function startSpin() {
 
 function getFilteredList() {
   let pool = includeCooldown ? [...myList] : myList.filter(i => !isOnCooldown(i));
+  // 交通過濾：嚴格執行，不 fallback
   if (todayTransport) pool = pool.filter(i => TRANSPORT_REACH[todayTransport].includes(i.transport));
-  if (todayBudget) pool = pool.filter(i => parseInt(i.budget || '2') <= parseInt(todayBudget) + 1);
+  // 預算過濾：cheap = 只列 $/$$ (budget 1,2)，treat = 不限制
+  if (todayBudget === 'cheap') pool = pool.filter(i => parseInt(i.budget || '2') <= 2);
+  // treat 不過濾
   if (activeFilter && activeFilter !== '全部') pool = pool.filter(i => i.tag === activeFilter);
-  return pool.length ? pool : (activeFilter && activeFilter !== '全部' ? myList.filter(i => i.tag === activeFilter) : myList);
+  // fallback 只放寬冷卻，不放寬交通和預算
+  if (!pool.length) {
+    let fallback = myList;
+    if (todayTransport) fallback = fallback.filter(i => TRANSPORT_REACH[todayTransport].includes(i.transport));
+    if (todayBudget === 'cheap') fallback = fallback.filter(i => parseInt(i.budget || '2') <= 2);
+    if (activeFilter && activeFilter !== '全部') fallback = fallback.filter(i => i.tag === activeFilter);
+    pool = fallback.length ? fallback : myList;
+  }
+  return pool;
 }
 
 function drawWheel() {

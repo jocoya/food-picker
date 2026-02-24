@@ -27,9 +27,8 @@
       <div class="setup-section">
         <div class="setup-label">💰 今天預算？</div>
         <div class="setup-options" id="setupBudget">
-          <button class="setup-opt" data-val="1" onclick="selectSetup('budget','1',this)">$ 省省吃</button>
-          <button class="setup-opt" data-val="2" onclick="selectSetup('budget','2',this)">$$ 普通</button>
-          <button class="setup-opt" data-val="3" onclick="selectSetup('budget','3',this)">$$$ 吃好一點</button>
+                    <button class="setup-opt" data-val="cheap" onclick="selectSetup('budget','cheap',this)"> 隨便吃吃</button>
+          <button class="setup-opt" data-val="treat" onclick="selectSetup('budget','treat',this)"> 吃點好的</button>
         </div>
       </div>
       <div class="setup-section">
@@ -47,6 +46,7 @@
   <!-- 首頁 -->
   <div id="page-home" class="page">
     <div class="hero">
+      <button class="hero-back-btn" onclick="backToSetup()">← 重新設定</button>
       <div class="hero-emoji">🍽️</div>
       <h1>今天吃什麼？</h1>
       <p class="subtitle">讓我來幫你決定</p>
@@ -241,10 +241,10 @@
         <option value="3">$$$ 貴</option>
       </select>
       <select id="newTransport">
-        <option value="walk">🚶 走路</option>
+        <option value="mall">🏬 百貨</option>
         <option value="bike">🛵 騎車</option>
         <option value="car">🚗 開車</option>
-        <option value="any" selected>🌐 皆可</option>
+        <option value="any" selected>🌐 不限</option>
       </select>
       <select id="newFreq">
         <option value="daily">🔁 天天可以</option>

@@ -735,3 +735,19 @@ body {
 }
 .editor-save { flex: 1; padding: 10px; font-size: 14px; }
 .editor-cancel { width: auto; padding: 10px 16px; font-size: 14px; }
+
+/* Hero back button */
+.hero { position: relative; }
+.hero-back-btn {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+.hero-back-btn:active { background: rgba(255,255,255,0.35); }
