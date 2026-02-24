@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>今天吃什麼？</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#ff6b35" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <!-- iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="吃什麼" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+</head>
+<body>
+
+  <!-- 今日設定頁 -->
+  <div id="page-setup" class="page active">
+    <div class="hero">
+      <div class="hero-emoji">🍽️</div>
+      <h1>今天吃什麼？</h1>
+      <p class="subtitle">先設定一下今天的狀況</p>
+    </div>
+    <div class="setup-body">
+      <div class="setup-section">
+        <div class="setup-label">💰 今天預算？</div>
+        <div class="setup-options" id="setupBudget">
+          <button class="setup-opt" data-val="1" onclick="selectSetup('budget','1',this)">$ 省省吃</button>
+          <button class="setup-opt" data-val="2" onclick="selectSetup('budget','2',this)">$$ 普通</button>
+          <button class="setup-opt" data-val="3" onclick="selectSetup('budget','3',this)">$$$ 吃好一點</button>
+        </div>
+      </div>
+      <div class="setup-section">
+        <div class="setup-label">🚗 今天怎麼去？</div>
+        <div class="setup-options" id="setupTransport">
+          <button class="setup-opt" data-val="walk" onclick="selectSetup('transport','walk',this)">🚶 走路</button>
+          <button class="setup-opt" data-val="bike" onclick="selectSetup('transport','bike',this)">🛵 騎車</button>
+          <button class="setup-opt" data-val="car"  onclick="selectSetup('transport','car',this)">🚗 開車</button>
+        </div>
+      </div>
+      <button class="btn-primary setup-go" id="setupGoBtn" onclick="finishSetup()" disabled>出發選餐廳 →</button>
+    </div>
+  </div>
+
+  <!-- 首頁 -->
+  <div id="page-home" class="page">
+    <div class="hero">
+      <div class="hero-emoji">🍽️</div>
+      <h1>今天吃什麼？</h1>
+      <p class="subtitle">讓我來幫你決定</p>
+    </div>
+    <div class="card-list">
+      <button class="card" onclick="goTo('page-mode')">
+        <span class="card-emoji">🏠</span>
+        <div>
+          <div class="card-title">從常去清單選</div>
+          <div class="card-desc">你儲存的餐廳 / 便當 / 火鍋</div>
+        </div>
+      </button>
+      <button class="card" onclick="startQuizMode()">
+        <span class="card-emoji">🎲</span>
+        <div>
+          <div class="card-title">隨便選個種類</div>
+          <div class="card-desc">問幾個問題幫你縮小範圍</div>
+        </div>
+      </button>
+      <button class="card" onclick="goTo('page-list-manage')">
+        <span class="card-emoji">✏️</span>
+        <div>
+          <div class="card-title">管理常去清單</div>
+          <div class="card-desc">新增 / 刪除餐廳</div>
+        </div>
+      </button>
+      <button class="card" onclick="goTo('page-stats')">
+        <span class="card-emoji">📊</span>
+        <div>
+          <div class="card-title">吃飯統計</div>
+          <div class="card-desc">看看你最常吃什麼</div>
+        </div>
+      </button>
+      <button class="card" onclick="startMultiplayer()">
+        <span class="card-emoji">👥</span>
+        <div>
+          <div class="card-title">多人模式</div>
+          <div class="card-desc">兩人各自刷卡，取交集對決</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 選機制 -->
+  <div id="page-mode" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>選一種方式</h2>
+    </div>
+    <div id="mode-filter" class="filter-row"></div>
+    <div class="cooldown-toggle-row" id="cooldownToggleRow"></div>
+    <div class="card-list">
+      <button class="card" onclick="startSpin()">
+        <span class="card-emoji">🎡</span>
+        <div>
+          <div class="card-title">隨機轉盤</div>
+          <div class="card-desc">轉一下，交給命運</div>
+        </div>
+      </button>
+      <button class="card" onclick="startDuel()">
+        <span class="card-emoji">⚔️</span>
+        <div>
+          <div class="card-title">Tinder 刷卡 → 對決</div>
+          <div class="card-desc">先刷掉不想吃的，再一對一淘汰</div>
+        </div>
+      </button>
+      <button class="card" onclick="startQuickRandom()">
+        <span class="card-emoji">🎰</span>
+        <div>
+          <div class="card-title">我就是不知道</div>
+          <div class="card-desc">一鍵隨機，完全交給 APP</div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 轉盤頁 -->
+  <div id="page-spin" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-mode')">← 返回</button>
+      <h2>隨機轉盤</h2>
+    </div>
+    <div class="spin-wrap">
+      <div class="spin-pointer">▼</div>
+      <canvas id="spinCanvas" width="300" height="300"></canvas>
+    </div>
+    <button class="btn-primary" id="spinBtn" onclick="spinWheel()">轉！</button>
+  </div>
+
+  <!-- Tinder 刷卡頁 -->
+  <div id="page-swipe" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-mode')">← 返回</button>
+      <h2>刷掉不想吃的</h2>
+    </div>
+    <div class="swipe-counter" id="swipeCounter"></div>
+    <div class="swipe-area">
+      <div class="swipe-card" id="swipeCard">
+        <div class="swipe-card-bg" id="swipeCardBg"></div>
+        <div class="swipe-card-overlay"></div>
+        <div class="swipe-emoji" id="swipeEmoji"></div>
+        <div class="swipe-card-content">
+          <div class="swipe-name" id="swipeName"></div>
+          <div class="swipe-tag" id="swipeTag"></div>
+        </div>
+        <div class="swipe-label swipe-label-yes" id="swipeLabelYes">想吃 ✓</div>
+        <div class="swipe-label swipe-label-no" id="swipeLabelNo">不要 ✕</div>
+      </div>
+    </div>
+    <div class="swipe-btns">
+      <button class="swipe-btn-no" onclick="swipeNo()">✕</button>
+      <div class="swipe-hint">左滑不要・右滑想吃</div>
+      <button class="swipe-btn-yes" onclick="swipeYes()">♥</button>
+    </div>
+    <button class="btn-ghost swipe-skip" onclick="swipeDone()">跳過，直接對決</button>
+  </div>
+
+  <!-- 二選一對決 -->
+  <div id="page-duel" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-mode')">← 返回</button>
+      <h2>二選一對決</h2>
+    </div>
+    <p class="duel-hint">選你比較想吃的</p>
+    <div class="duel-wrap">
+      <button class="duel-btn" id="duelA" onclick="pickDuel(0)"></button>
+      <div class="duel-vs">VS</div>
+      <button class="duel-btn" id="duelB" onclick="pickDuel(1)"></button>
+    </div>
+    <div class="duel-progress" id="duelProgress"></div>
+  </div>
+
+  <!-- 問卷引導（種類模式） -->
+  <div id="page-quiz" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>今天想吃什麼感覺？</h2>
+    </div>
+    <div id="quiz-body"></div>
+  </div>
+
+  <!-- 結果頁 -->
+  <div id="page-result" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 首頁</button>
+      <h2>就決定是你了</h2>
+    </div>
+    <div class="result-wrap">
+      <div class="result-hero" id="resultHero">
+        <div class="result-hero-emoji" id="resultEmoji">🍜</div>
+        <div class="result-hero-overlay">
+          <div class="result-name" id="resultName">拉麵</div>
+          <div class="result-tag" id="resultTag"></div>
+        </div>
+      </div>
+      <div class="result-history" id="resultHistory"></div>
+    </div>
+    <div class="result-actions">
+      <button class="btn-confirm" id="confirmBtn" onclick="confirmEat()">✅ 今天吃了！</button>
+      <button class="btn-primary" onclick="openMaps()">📍 找附近的店</button>
+      <button class="btn-secondary" id="rerollBtn" onclick="reroll()">🔄 換一個（還剩 <span id="rerollCount">3</span> 次）</button>
+      <button class="btn-ghost" onclick="goTo('page-home')">回首頁</button>
+    </div>
+  </div>
+
+  <!-- 管理清單 -->
+  <div id="page-list-manage" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>常去清單</h2>
+      <div style="margin-left:auto;display:flex;gap:6px;">
+        <button class="btn-ghost" style="padding:4px 8px;font-size:13px;" onclick="exportData()">📤 匯出</button>
+        <button class="btn-ghost" style="padding:4px 8px;font-size:13px;" onclick="document.getElementById('importFile').click()">📥 匯入</button>
+        <input id="importFile" type="file" accept=".json" style="display:none" onchange="importData(event)" />
+        <button class="btn-ghost" style="padding:4px 8px;font-size:13px;" onclick="goTo('page-tags')">🏷️ 種類</button>
+      </div>
+    </div>
+    <div class="add-form">
+      <div class="new-icon-wrap">
+        <div class="new-icon-preview" id="newIconPreview" onclick="document.getElementById('newIconFile').click()">＋</div>
+        <input id="newIconEmoji" type="text" placeholder="😀" maxlength="2"
+          style="width:52px;flex:none;text-align:center;font-size:22px;border-radius:10px;border:1.5px solid #ddd;padding:8px 4px;"
+          oninput="syncIconPreview()" />
+        <input id="newIconFile" type="file" accept="image/*" style="display:none" onchange="handleIconFile(event)" />
+      </div>
+      <input id="newName" type="text" placeholder="餐廳名稱 / 食物" />
+      <select id="newTag"></select>
+      <select id="newBudget">
+        <option value="1">$ 便宜</option>
+        <option value="2" selected>$$ 普通</option>
+        <option value="3">$$$ 貴</option>
+      </select>
+      <select id="newTransport">
+        <option value="walk">🚶 走路</option>
+        <option value="bike">🛵 騎車</option>
+        <option value="car">🚗 開車</option>
+        <option value="any" selected>🌐 皆可</option>
+      </select>
+      <select id="newFreq">
+        <option value="daily">🔁 天天可以</option>
+        <option value="nextday">📅 隔天再說</option>
+        <option value="weekly">📅 一週一次</option>
+        <option value="biweekly">🗓️ 兩週一次</option>
+        <option value="special">✨ 偶爾想到</option>
+      </select>
+      <button class="btn-primary" onclick="addItem()">新增</button>
+    </div>
+    <div id="list-items"></div>
+  </div>
+
+  <!-- 統計頁 -->
+  <div id="page-stats" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>吃飯統計</h2>
+    </div>
+    <div id="stats-body" class="stats-body"></div>
+  </div>
+
+  <!-- 自訂 tag 管理 -->
+  <div id="page-tags" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-list-manage')">← 返回</button>
+      <h2>自訂種類</h2>
+    </div>
+    <div class="add-form">
+      <input id="newTagEmoji" type="text" placeholder="🍜" maxlength="2" style="width:56px;flex:none;text-align:center;font-size:22px;" />
+      <input id="newTagName" type="text" placeholder="種類名稱" />
+      <button class="btn-primary" onclick="addCustomTag()">新增</button>
+    </div>
+    <div id="tag-list"></div>
+  </div>
+
+  <!-- 多人模式：玩家 A 刷卡 -->
+  <div id="page-multi-a" class="page">
+    <div class="top-bar">
+      <button class="back-btn" onclick="goTo('page-home')">← 返回</button>
+      <h2>👤 玩家 A 刷卡</h2>
+    </div>
+    <div class="swipe-counter" id="multiACounter"></div>
+    <div class="swipe-area">
+      <div class="swipe-card" id="multiACard">
+        <div class="swipe-card-bg" id="multiACardBg"></div>
+        <div class="swipe-card-overlay"></div>
+        <div class="swipe-emoji" id="multiAEmoji"></div>
+        <div class="swipe-card-content">
+          <div class="swipe-name" id="multiAName"></div>
+          <div class="swipe-tag" id="multiATag"></div>
+        </div>
+        <div class="swipe-label swipe-label-yes" id="multiALabelYes">想吃 ✓</div>
+        <div class="swipe-label swipe-label-no" id="multiALabelNo">不要 ✕</div>
+      </div>
+    </div>
+    <div class="swipe-btns">
+      <button class="swipe-btn-no" onclick="multiSwipe('A', false)">✕</button>
+      <div class="swipe-hint">左滑不要・右滑想吃</div>
+      <button class="swipe-btn-yes" onclick="multiSwipe('A', true)">♥</button>
+    </div>
+  </div>
+
+  <!-- 多人模式：玩家 B 刷卡 -->
+  <div id="page-multi-b" class="page">
+    <div class="top-bar">
+      <h2>👤 玩家 B 刷卡</h2>
+    </div>
+    <div class="multi-handoff">
+      <div class="handoff-emoji">🤝</div>
+      <div class="handoff-text">換玩家 B 了</div>
+      <button class="btn-primary" onclick="startMultiB()">開始刷卡</button>
+    </div>
+  </div>
+
+  <!-- 多人模式：玩家 B 刷卡中 -->
+  <div id="page-multi-b-swipe" class="page">
+    <div class="top-bar">
+      <h2>👤 玩家 B 刷卡</h2>
+    </div>
+    <div class="swipe-counter" id="multiBCounter"></div>
+    <div class="swipe-area">
+      <div class="swipe-card" id="multiBCard">
+        <div class="swipe-card-bg" id="multiBCardBg"></div>
+        <div class="swipe-card-overlay"></div>
+        <div class="swipe-emoji" id="multiBEmoji"></div>
+        <div class="swipe-card-content">
+          <div class="swipe-name" id="multiBName"></div>
+          <div class="swipe-tag" id="multiBTag"></div>
+        </div>
+        <div class="swipe-label swipe-label-yes" id="multiBLabelYes">想吃 ✓</div>
+        <div class="swipe-label swipe-label-no" id="multiBLabelNo">不要 ✕</div>
+      </div>
+    </div>
+    <div class="swipe-btns">
+      <button class="swipe-btn-no" onclick="multiSwipe('B', false)">✕</button>
+      <div class="swipe-hint">左滑不要・右滑想吃</div>
+      <button class="swipe-btn-yes" onclick="multiSwipe('B', true)">♥</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js');
+    }
+  </script>
+</body>
+</html>
